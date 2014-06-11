@@ -4,7 +4,7 @@ from pyftpdlib.servers import FTPServer
 
 user = 'root'
 passwd = 'root'
-ip = '172.18.10.11'
+ip = '172.18.10.12'
 port = 21
 
 authorizer = DummyAuthorizer()

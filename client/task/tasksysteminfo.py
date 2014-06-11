@@ -7,7 +7,7 @@ class tasksysteminfo(task.Task):
         stdin, stdout, stderr = sshClient.execute("uname -a")
         outs = stdout.readlines()
         errs = stderr.readlines()
-        with open(self.__classs.__name__ + ".txt", 'a') as fd:
+        with open("tasksysteminfo.txt", 'a') as fd:
             if len(outs) > 0:
                 fd.write("uanme={0}".format(outs[0]))
         
@@ -17,7 +17,7 @@ class tasksysteminfo(task.Task):
         if len(errs) > 0:
             pass
         else:
-            with open(self.__classs.__name__ + ".txt", 'a') as fd:
+            with open("tasksysteminfo.txt", 'a') as fd:
                 if len(outs) > 0:
                     fd.write("distribution={0}".format(outs[0]))
         self.logFinish()

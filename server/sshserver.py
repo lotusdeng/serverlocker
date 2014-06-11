@@ -25,6 +25,8 @@ import socket
 import sys
 import threading
 import traceback
+import subprocess
+import multiprocessing
 
 import paramiko
 #from paramiko.py3compat import b, u, decodebytes
@@ -77,72 +79,89 @@ class Server (paramiko.ServerInterface):
                                   pixelheight, modes):
         return True
 
-
-# now connect
-try:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(('', 2200))
-except Exception as e:
-    print('*** Bind failed: ' + str(e))
-    traceback.print_exc()
-    sys.exit(1)
-
-try:
-    sock.listen(100)
-    print('Listening for connection ...')
-    client, addr = sock.accept()
-except Exception as e:
-    print('*** Listen/accept failed: ' + str(e))
-    traceback.print_exc()
-    sys.exit(1)
-
-print('Got a connection!')
-
-try:
-    t = paramiko.Transport(client)
-    try:
-        t.load_server_moduli()
-    except:
-        print('(Failed to load moduli -- gex will be unsupported.)')
-        raise
-    t.add_server_key(host_key)
-    server = Server()
-    try:
-        t.start_server(server=server)
-    except paramiko.SSHException:
-        print('*** SSH negotiation failed.')
-        sys.exit(1)
-
-    # wait for auth
-    chan = t.accept(20)
-    if chan is None:
-        print('*** No channel.')
-        sys.exit(1)
-    print('Authenticated!')
-
-    server.event.wait(10)
-    if not server.event.isSet():
-        print('*** Client never asked for a shell.')
-        sys.exit(1)
-        
-    chan.send(os.getcwd())
-    chan.r
-
-    chan.send('\r\n\r\nWelcome to my dorky little BBS!\r\n\r\n')
-    chan.send('We are on fire all the time!  Hooray!  Candy corn for everyone!\r\n')
-    chan.send('Happy birthday to Robot Dave!\r\n\r\n')
-    chan.send('Username: ')
+def sessionProcess(chan):
+    print chan
+    stdout, stdin = subprocess.Popen("bash", stdout=subprocess.PIPE, stdin=subprocess.PIPE).communicate()
     f = chan.makefile('rU')
-    username = f.readline().strip('\r\n')
-    chan.send('\r\nI don\'t like you, ' + username + '.\r\n')
+    while True:
+        cmd = f.readline()
+        stdin.write(cmd)
+        chan.send(stdout)
     chan.close()
+    pass
 
-except Exception as e:
-    print('*** Caught exception: ' + str(e.__class__) + ': ' + str(e))
-    traceback.print_exc()
+def main():
+    # now connect
     try:
-        t.close()
-    except:
-        pass
-    sys.exit(1)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(('', 2200))
+    except Exception as e:
+        print('*** Bind failed: ' + str(e))
+        traceback.print_exc()
+        sys.exit(1)
+    
+    try:
+        sock.listen(100)
+        print('Listening for connection ...')
+        client, addr = sock.accept()
+    except Exception as e:
+        print('*** Listen/accept failed: ' + str(e))
+        traceback.print_exc()
+        sys.exit(1)
+    
+    print('Got a connection!')
+    
+    try:
+        t = paramiko.Transport(client)
+        try:
+            t.load_server_moduli()
+        except:
+            print('(Failed to load moduli -- gex will be unsupported.)')
+            raise
+        t.add_server_key(host_key)
+        server = Server()
+        try:
+            t.start_server(server=server)
+        except paramiko.SSHException:
+            print('*** SSH negotiation failed.')
+            sys.exit(1)
+    
+        # wait for auth
+        while True:
+            chan = t.accept(20)
+            if chan is None:
+                print('*** No channel.')
+                sys.exit(1)
+            print('Authenticated!')
+        
+            server.event.wait(10)
+            if not server.event.isSet():
+                print('*** Client never asked for a shell.')
+                sys.exit(1)
+                
+            
+            chan.send('\r\n\r\nWelcome to my dorky little BBS!\r\n\r\n')
+            chan.send('We are on fire all the time!  Hooray!  Candy corn for everyone!\r\n')
+            chan.send('Happy birthday to Robot Dave!\r\n\r\n')
+            chan.send('Username: ')
+            f = chan.makefile('rU')
+            username = f.readline().strip('\r\n')
+            chan.send('\r\nI don\'t like you, ' + username + '.\r\n')
+            chan.close()
+#             chan.send(os.getcwd())
+#             p = multiprocessing.Process(target=sessionProcess, args=(chan,))
+#             p.start()
+#             p.join()
+    
+    except Exception as e:
+        print('*** Caught exception: ' + str(e.__class__) + ': ' + str(e))
+        traceback.print_exc()
+        try:
+            t.close()
+        except:
+            pass
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()

@@ -26,10 +26,26 @@ def init():
      cf = ConfigParser.ConfigParser()
      cf.read("task.ini")
      sshClient = SSHClient()
-     sshClient.connect(cf.get("server", "ip"), cf.get("server", "user"), cf.get("server", "passwd"))
-     util.mkServerLockDir(sshClient)
-     util.installFtpServer(sshClient, cf.get("server", "user"), cf.get("server", "newpasswd"),
-                           cf.get("server", "ip"), cf.getint("server", "ftpport"))
+     ip = cf.get("server", "ip")
+     user = cf.get("server", "user")
+     passwd = cf.get("server", "passwd")
+     newpasswd = cf.get("server", "newpasswd")
+     ftpport = cf.getint("server", "ftpport")
+     sshClient.connect(ip , user, passwd)
+     serverOs = util.getServerOS(sshClient)
+     if serverOs == "linux":
+         if not os.path.isfile("installed"):
+             print "first time init, so install ftp server"
+             util.mkServerLockDir(sshClient)
+             util.installFtpServer(sshClient, user, newpasswd, ip, ftpport)
+             with open("installed", "w") as fd:
+                 pass
+         else:
+             print "alread install ftp server"
+             pass
+     else:
+         pass
+     
      
 def doTasks():
     cf = ConfigParser.ConfigParser()
@@ -78,7 +94,7 @@ def doTasks():
             doTasks()
             
 def main():
-    #init()
+    init()
     
     cf = ConfigParser.ConfigParser()
     cf.read("task.ini")

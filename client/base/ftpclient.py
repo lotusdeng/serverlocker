@@ -30,7 +30,8 @@ class FTPClient():
         self.ftp = FTP()
         self.ftp.connect(ip, port)
         self.ftp.login(user, passwd)
-        self.ftp.set_debuglevel(2)
+        #self.ftp.set_debuglevel(2)
+        self.ftp.set_pasv(False)
         
     def getFileSize(self, filePath):
         dir = os.path.dirname(filePath)
@@ -62,7 +63,10 @@ class FTPClient():
         if localSize >= remoteFileSize:
             return
         self.ftp.voidcmd('TYPE I')#set binary model
-        conn = self.ftp.transfercmd("RETR " + remoteFileName , localSize)
+        if localSize == 0:
+            conn = self.ftp.transfercmd("RETR " + remoteFileName)
+        else:
+            conn = self.ftp.transfercmd("RETR " + remoteFileName , localSize)
         localFd = open(localPath, "ab")
         while True:
             data = conn.recv(1024*1024)
@@ -71,36 +75,46 @@ class FTPClient():
             localFd.write(data)
         
         localFd.close()
-        
-    def downloadFolder(self, remotePath, localPath):
-        self.ftp.cwd(remotePath)
+    
+   
+    def downloadFolder(self, remoteDirPath, localDirPath):
+        self.ftp.cwd(remoteDirPath)
         lines = []
+        print "start get dir ", remoteDirPath
 
         self.ftp.retrlines("MLSD", lines.append)
         for i in lines:
+            self.ftp.cwd(remoteDirPath)
             file = FTPFile(i)
             if file.type == "file":
-                localFilePath = os.path.join(localPath, file.name)
-                os.system("touch " + localFilePath)
+                print "start get file ", os.path.join(remoteDirPath, file.name)
+                localFilePath = os.path.join(localDirPath, file.name)
+                if not os.path.exists(localFilePath):
+                    os.system("touch " + localFilePath)
                 if file.size != 0:
-                    localSize = os.stat(localPath).st_size
-                    if localSize > file.size:
+                    localSize = os.stat(localFilePath).st_size
+                    if localSize >= file.size:
                         continue
                     self.ftp.voidcmd('TYPE I')#set binary model
-                    print file.name
-                    conn = self.ftp.transfercmd("RETR " + file.name , localSize)
+                    print "localsize:", localSize
+                    if localSize == 0:
+                        conn = self.ftp.transfercmd("RETR " + file.name)
+                    else:
+                        conn = self.ftp.transfercmd("RETR " + file.name , str(localSize))
                     with open(localFilePath, "ab") as localFd:
                         while True:
                             data = conn.recv(1024*1024)
                             if not data:
                                 break
                             localFd.write(data)
-                    conn.close()
+                    #conn.close()
                     
             elif file.type == "dir":
-                localChildDir = os.path.join(localPath, file.name)
-                os.makedirs(localChildDir)
-                self.downloadFolder(os.path.join(remotePath, file.name), localChildDir)
+                localChildDir = os.path.join(localDirPath, file.name)
+                remoteChildDir = os.path.join(remoteDirPath, file.name)
+                if not os.path.exists(localChildDir):
+                    os.makedirs(localChildDir)
+                self.downloadFolder(remoteChildDir, localChildDir)
                     
                
             
@@ -116,6 +130,6 @@ class FTPClient():
 
 if __name__ == "__main__":
     cli = FTPClient()
-    cli.connect("172.18.10.11", 21, "root", "root")
+    cli.connect("172.18.10.12", 21, "root", "root")
     cli.downloadFolder("/var/log", "./log")
     cli.close()
